@@ -3,25 +3,23 @@ const session = require("express-session");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+
 const {
   getOAuthRequestToken,
   getOAuthAccessTokenWith,
   oauthGetUserById,
 } = require("./utils");
-const { TwitterApi } = require("twitter-api-v2");
 
 const path = require("path");
 const fs = require("fs");
+const { default: axios } = require("axios");
 
 const TEMPLATE = fs.readFileSync(
   path.resolve(__dirname, "client", "template.html"),
   { encoding: "utf8" }
 );
 
-const userClient = new TwitterApi({
-  appKey: process.env.TWITTER_CONSUMER_KEY,
-  appSecret: process.env.TWITTER_CONSUMER_SECRET,
-});
+const actionUrl = "https://api.twitter.com/2/tweets";
 
 const COOKIE_SECRET = process.env.COOKIE_SECRET;
 
@@ -48,8 +46,7 @@ async function main() {
         <input id='tweet' type='text' name='message'>
         <button type='submit'>Post a tweet</button>
         <form>
-        <a href="/twitter/logout">logout</a>
-        
+        <a href="/twitter/logout">logout</a>    
       `
         )
       );
@@ -67,24 +64,24 @@ async function main() {
     req.session.destroy(() => res.redirect("/"));
   }
 
-  app.get("/twitter/authenticate", twitter("authenticate"));
+  // app.get("/twitter/authenticate", twitter("authenticate"));
   app.get("/twitter/authorize", twitter("authorize"));
   function twitter(method = "authorize") {
     return async (req, res) => {
-      console.log(`/twitter/${method}`);
+      // console.log(`/twitter/${method}`);
       const { oauthRequestToken, oauthRequestTokenSecret } =
         await getOAuthRequestToken();
-      console.log(`/twitter/${method} ->`, {
-        oauthRequestToken,
-        oauthRequestTokenSecret,
-      });
+      // console.log(`/twitter/${method} ->`, {
+      //   oauthRequestToken,
+      //   oauthRequestTokenSecret,
+      // });
 
       req.session = req.session || {};
       req.session.oauthRequestToken = oauthRequestToken;
       req.session.oauthRequestTokenSecret = oauthRequestTokenSecret;
 
       const authorizationUrl = `https://api.twitter.com/oauth/${method}?oauth_token=${oauthRequestToken}`;
-      console.log("redirecting user to ", authorizationUrl);
+      // console.log("redirecting user to ", authorizationUrl);
       res.redirect(authorizationUrl);
     };
   }
@@ -92,18 +89,19 @@ async function main() {
   app.get("/twitter/callback", async (req, res) => {
     const { oauthRequestToken, oauthRequestTokenSecret } = req.session;
     const { oauth_verifier: oauthVerifier } = req.query;
-    console.log("/twitter/callback", {
+    // console.log("/twitter/callback", {
+    //   oauthRequestToken,
+    //   oauthRequestTokenSecret,
+    //   oauthVerifier,
+    // });
+
+    const r = await getOAuthAccessTokenWith({
       oauthRequestToken,
       oauthRequestTokenSecret,
       oauthVerifier,
     });
-
-    const { oauthAccessToken, oauthAccessTokenSecret, results } =
-      await getOAuthAccessTokenWith({
-        oauthRequestToken,
-        oauthRequestTokenSecret,
-        oauthVerifier,
-      });
+    console.log(5, r);
+    const { oauthAccessToken, oauthAccessTokenSecret, results } = r;
     req.session.oauthAccessToken = oauthAccessToken;
 
     const { user_id: userId /*, screen_name */ } = results;
@@ -118,32 +116,44 @@ async function main() {
       httpOnly: true,
     });
 
-    console.log("user succesfully logged in with twitter", user.screen_name);
+    // console.log("user succesfully logged in with twitter", user.screen_name);
     req.session.save(() => res.redirect("/"));
   });
-//   app.post("/tweet/post", (req, res) => {
-//     const tweet = req.body.tweet;
+  app.post("/tweet/post", async (req, res) => {
+    const tweetPost = req.body.tweet;
+    const data = {
+      text: tweetPost,
+    };
 
-//     const params = {
-//       status: tweet,
-//     };
+    // const result = await getOAuthAccessTokenWith({
+    //   oauthRequestToken,
+    //   oauthRequestTokenSecret,
+    //   oauthVerifier
+    // });
+    // const { oauthAccessToken, oauthAccessTokenSecret} = result;
 
-//     userClient.post(
-//       "statuses/update",
-//       params,
-//       function (error, tweet, response) {
-//         if (error) {
-//           res.status(500).json({
-//             message: error,
-//           });
-//           return;
-//         }
-//         res.json({
-//           message: "Tweeted",
-//         });
-//         console.log(tweet); // Tweet body.
-//         console.log(response); // Raw response object.
-//       }
-//     );
-//   });
+    //console.log(oauthConsumer)
+    
+
+    // const authHeader = oauthConsumer.prepareParameters({
+    //   oauthAccessToken,
+    //   oauthAccessTokenSecret,
+    //   method: 'POST',
+    //   url: actionUrl,
+    // });
+
+    axios
+      .post(actionUrl, data, {
+        headers: {
+          Authorization: ["Authorization"],
+          "user-agent": "v2CreateTweetJS",
+          "content-type": "application/json",
+          accept: "application/json",
+        },
+      })
+      .then(
+        (res) => console.log(res),
+        (err) => console.log(err)
+      );
+  });
 }

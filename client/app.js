@@ -1,5 +1,4 @@
 const form = document.querySelector("form");
-
 form.addEventListener("submit", () => {
   const tweet = document.querySelector("#tweet").value;
 
@@ -12,7 +11,5 @@ form.addEventListener("submit", () => {
       tweet,
     }),
   })
-    .then((res) => res.json())
-    .then(() => alert("Posted"))
-    .catch((err) => console.log(error));
+  
 });
