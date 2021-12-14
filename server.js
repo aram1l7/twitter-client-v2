@@ -8,8 +8,8 @@ const {
   getOAuthRequestToken,
   getOAuthAccessTokenWith,
   oauthGetUserById,
+  oauthConsumer,
 } = require("./utils");
-
 const path = require("path");
 const fs = require("fs");
 const { default: axios } = require("axios");
@@ -110,10 +110,14 @@ async function main() {
       oauthAccessTokenSecret,
     });
 
+    console.log(oauthRequestTokenSecret, oauthRequestToken, oauthVerifier);
     req.session.twitter_screen_name = user.screen_name;
     res.cookie("twitter_screen_name", user.screen_name, {
       maxAge: 90000000,
       httpOnly: true,
+    });
+    res.cookie("verifier", oauthVerifier, {
+      maxAge: 90000000,
     });
 
     // console.log("user succesfully logged in with twitter", user.screen_name);
@@ -122,30 +126,29 @@ async function main() {
   app.post("/tweet/post", async (req, res) => {
     const tweetPost = req.body.tweet;
     const data = {
-      text: tweetPost,
+      "text": tweetPost,
     };
 
-    // const result = await getOAuthAccessTokenWith({
-    //   oauthRequestToken,
-    //   oauthRequestTokenSecret,
-    //   oauthVerifier
-    // });
-    // const { oauthAccessToken, oauthAccessTokenSecret} = result;
+    const verifier = req.cookies["verifier"];
 
-    //console.log(oauthConsumer)
-    
+    const { oauthRequestToken, oauthRequestTokenSecret } =
+      await getOAuthRequestToken();
 
-    // const authHeader = oauthConsumer.prepareParameters({
-    //   oauthAccessToken,
-    //   oauthAccessTokenSecret,
-    //   method: 'POST',
-    //   url: actionUrl,
-    // });
+    const result = await getOAuthAccessTokenWith({
+      oauthRequestToken,
+      oauthRequestTokenSecret,
+      verifier
+    });
+    const { oauthAccessToken, oauthAccessTokenSecret } = result;
+
+    console.log(verifier, oauthRequestToken, oauthRequestTokenSecret);
+
+    const authHeader = oauthConsumer.authHeader(actionUrl,oauthAccessToken,oauthAccessTokenSecret, 'POST');
 
     axios
       .post(actionUrl, data, {
         headers: {
-          Authorization: ["Authorization"],
+          Authorization: authHeader["Authorization"],
           "user-agent": "v2CreateTweetJS",
           "content-type": "application/json",
           accept: "application/json",

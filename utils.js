@@ -15,12 +15,6 @@ const oauthConsumer = new oauth.OAuth(
 );
 
 
-module.exports = {
-  oauthGetUserById,
-  getOAuthAccessTokenWith,
-  getOAuthRequestToken,
-};
-
 async function oauthGetUserById(
   userId,
   { oauthAccessToken, oauthAccessTokenSecret } = {}
@@ -64,3 +58,11 @@ async function getOAuthRequestToken() {
   });
 }
 
+
+
+module.exports = {
+  oauthGetUserById,
+  getOAuthAccessTokenWith,
+  getOAuthRequestToken,
+  oauthConsumer
+};
