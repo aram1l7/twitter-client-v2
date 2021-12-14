@@ -37,7 +37,7 @@ async function getOAuthAccessTokenWith({
       oauthVerifier,
       function (error, oauthAccessToken, oauthAccessTokenSecret, results) {
         return error
-          ? reject(new Error("Error getting OAuth access token"))
+          ? reject(new Error(error.data))
           : resolve({ oauthAccessToken, oauthAccessTokenSecret, results });
       }
     );
@@ -52,7 +52,7 @@ async function getOAuthRequestToken() {
       results
     ) {
       return error
-        ? reject(new Error("Error getting OAuth request token"))
+        ? reject(new Error(error))
         : resolve({ oauthRequestToken, oauthRequestTokenSecret, results });
     });
   });

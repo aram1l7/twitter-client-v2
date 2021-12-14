@@ -3,7 +3,6 @@ const session = require("express-session");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-
 const {
   getOAuthRequestToken,
   getOAuthAccessTokenWith,
@@ -113,50 +112,86 @@ async function main() {
     console.log(oauthRequestTokenSecret, oauthRequestToken, oauthVerifier);
     req.session.twitter_screen_name = user.screen_name;
     res.cookie("twitter_screen_name", user.screen_name, {
-      maxAge: 90000000,
+      maxAge: 999999999,
       httpOnly: true,
     });
-    res.cookie("verifier", oauthVerifier, {
-      maxAge: 90000000,
+    res.cookie("accessToken", oauthAccessToken, {
+      maxAge: 999999999,
+      httpOnly: true,
     });
+    res.cookie("accessTokenSecret", oauthAccessTokenSecret, {
+      maxAge: 999999999,
+      httpOnly: true,
+    });
+    // res.cookie("verifier", oauthVerifier, {
+    //   maxAge: 90000000,
+    // });
 
     // console.log("user succesfully logged in with twitter", user.screen_name);
     req.session.save(() => res.redirect("/"));
   });
   app.post("/tweet/post", async (req, res) => {
     const tweetPost = req.body.tweet;
-    const data = {
-      "text": tweetPost,
-    };
+    const oauthAccessToken = req.cookies["accessToken"];
+    const oauthAccessTokenSecret = req.cookies["accessTokenSecret"];
 
-    const verifier = req.cookies["verifier"];
+    console.log("brr", oauthAccessToken, oauthAccessTokenSecret);
 
-    const { oauthRequestToken, oauthRequestTokenSecret } =
-      await getOAuthRequestToken();
+    // console.log(oauthVerifier)
+    // const { oauthRequestToken, oauthRequestTokenSecret } =
+    //   await getOAuthRequestToken();
 
-    const result = await getOAuthAccessTokenWith({
-      oauthRequestToken,
-      oauthRequestTokenSecret,
-      verifier
-    });
-    const { oauthAccessToken, oauthAccessTokenSecret } = result;
+    // const result = await getOAuthAccessTokenWith({
+    //   oauthRequestToken,
+    //   oauthRequestTokenSecret,
+    //   oauthVerifier,
+    // });
+    // const { oauthAccessToken, oauthAccessTokenSecret } = result;
 
-    console.log(verifier, oauthRequestToken, oauthRequestTokenSecret);
+    // console.log(verifier, oauthRequestToken, oauthRequestTokenSecret);
 
-    const authHeader = oauthConsumer.authHeader(actionUrl,oauthAccessToken,oauthAccessTokenSecret, 'POST');
+    var orderedParams = oauthConsumer._prepareParameters(
+      oauthAccessToken,
+      oauthAccessTokenSecret,
+      "POST",
+      actionUrl
+    );
+    var authHeader = oauthConsumer._buildAuthorizationHeaders(orderedParams);
+
+    // const authHeader = oauthConsumer.authHeader(
+    //   actionUrl,
+    //   oauthAccessToken,
+    //   oauthAccessTokenSecret,
+    //   "POST"
+    // );
 
     axios
-      .post(actionUrl, data, {
-        headers: {
-          Authorization: authHeader["Authorization"],
-          "user-agent": "v2CreateTweetJS",
-          "content-type": "application/json",
-          accept: "application/json",
+      .post(
+        actionUrl,
+        {
+          "text": tweetPost,
         },
+        {
+          headers: {
+            Authorization: authHeader,
+            "user-agent": "v2CreateTweetJS",
+            "content-type": "application/json",
+            accept: "application/json",
+          },
+        }
+      )
+      .then(res => {
+       console.log(res)
       })
-      .then(
-        (res) => console.log(res),
-        (err) => console.log(err)
-      );
+      .catch((error) =>
+        error.response
+          ? console.log(error.response)
+          : error.request
+          ? console.log(error.request)
+          : error.message
+      ).finally(() => {
+        res.redirect('/')
+        
+      });
   });
 }
