@@ -2,6 +2,7 @@ const express = require("express");
 const session = require("express-session");
 require("dotenv").config();
 const cookieParser = require("cookie-parser");
+const multer = require('multer')
 const cors = require("cors");
 const {
   getOAuthRequestToken,
@@ -12,6 +13,32 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { default: axios } = require("axios");
+
+const storage = multer.diskStorage({
+  destination:'./client/uploads/',
+  filename: function(req,file,cb){
+    cb(null,Date.now() + path.extname(file.originalname))
+  }
+})
+
+const upload = multer({
+  storage:storage,
+  limits:{fileSize:1000000},
+  fileFilter:function(req,file,cb){
+    checkFileType(file,cb)
+  }
+}).single('media')
+
+function checkFileType(file,cb){
+  const fileTypes = /jpeg|png|gif|mp4|jpg/
+  const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = fileTypes.test(file.mimetype)
+  if(mimetype && extname){
+    return cb(null,true)
+  } else {
+    cb('Error image and video only')
+  }
+}
 
 const TEMPLATE = fs.readFileSync(
   path.resolve(__dirname, "client", "template.html"),
@@ -41,8 +68,9 @@ async function main() {
           `
         <h1>Hello ${req.cookies.twitter_screen_name}</h1>
         <br>
-        <form method='post' action='/tweet/post'>
+        <form method='post' action='/tweet/post' enctype='multipart/form-data'>
         <input id='tweet' type='text' name='message'>
+        <input type='file' name='media'>
         <button type='submit'>Post a tweet</button>
         <form>
         <a href="/twitter/logout">logout</a>    
@@ -67,20 +95,16 @@ async function main() {
   app.get("/twitter/authorize", twitter("authorize"));
   function twitter(method = "authorize") {
     return async (req, res) => {
-      // console.log(`/twitter/${method}`);
+   
       const { oauthRequestToken, oauthRequestTokenSecret } =
         await getOAuthRequestToken();
-      // console.log(`/twitter/${method} ->`, {
-      //   oauthRequestToken,
-      //   oauthRequestTokenSecret,
-      // });
 
       req.session = req.session || {};
       req.session.oauthRequestToken = oauthRequestToken;
       req.session.oauthRequestTokenSecret = oauthRequestTokenSecret;
 
       const authorizationUrl = `https://api.twitter.com/oauth/${method}?oauth_token=${oauthRequestToken}`;
-      // console.log("redirecting user to ", authorizationUrl);
+    
       res.redirect(authorizationUrl);
     };
   }
@@ -88,11 +112,7 @@ async function main() {
   app.get("/twitter/callback", async (req, res) => {
     const { oauthRequestToken, oauthRequestTokenSecret } = req.session;
     const { oauth_verifier: oauthVerifier } = req.query;
-    // console.log("/twitter/callback", {
-    //   oauthRequestToken,
-    //   oauthRequestTokenSecret,
-    //   oauthVerifier,
-    // });
+ 
 
     const r = await getOAuthAccessTokenWith({
       oauthRequestToken,
@@ -123,11 +143,7 @@ async function main() {
       maxAge: 999999999,
       httpOnly: true,
     });
-    // res.cookie("verifier", oauthVerifier, {
-    //   maxAge: 90000000,
-    // });
 
-    // console.log("user succesfully logged in with twitter", user.screen_name);
     req.session.save(() => res.redirect("/"));
   });
   app.post("/tweet/post", async (req, res) => {
@@ -135,20 +151,6 @@ async function main() {
     const oauthAccessToken = req.cookies["accessToken"];
     const oauthAccessTokenSecret = req.cookies["accessTokenSecret"];
 
-    console.log("brr", oauthAccessToken, oauthAccessTokenSecret);
-
-    // console.log(oauthVerifier)
-    // const { oauthRequestToken, oauthRequestTokenSecret } =
-    //   await getOAuthRequestToken();
-
-    // const result = await getOAuthAccessTokenWith({
-    //   oauthRequestToken,
-    //   oauthRequestTokenSecret,
-    //   oauthVerifier,
-    // });
-    // const { oauthAccessToken, oauthAccessTokenSecret } = result;
-
-    // console.log(verifier, oauthRequestToken, oauthRequestTokenSecret);
 
     var orderedParams = oauthConsumer._prepareParameters(
       oauthAccessToken,
@@ -158,13 +160,16 @@ async function main() {
     );
     var authHeader = oauthConsumer._buildAuthorizationHeaders(orderedParams);
 
-    // const authHeader = oauthConsumer.authHeader(
-    //   actionUrl,
-    //   oauthAccessToken,
-    //   oauthAccessTokenSecret,
-    //   "POST"
-    // );
+    upload(req,res,(err) => {
+      if(err){
+        console.log(err)
+      } else {
 
+        console.log(req.file)
+      }
+    })
+
+   
     axios
       .post(
         actionUrl,
